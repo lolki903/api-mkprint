@@ -5,6 +5,7 @@ let user = require('./routes/user');
 let session = require('express-session')
 const cors = require('cors');
 const verif = require('./routes/email')
+const message = require('./routes/message')
 //ajout moteur de template
 app.use(cors());
 app.use(express.urlencoded())
@@ -23,4 +24,5 @@ app.get('/',(req,res)=>{
 )
 app.use('/verif',verif)
 app.use('/user',user)
+app.use('/message',message)
 app.listen(3003)

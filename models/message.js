@@ -1,4 +1,5 @@
 let database = require('../config/database')
+let axios = require('axios')
 
 class Message {
     constructor(d) {
@@ -62,10 +63,48 @@ class Message {
     set id(id) {
         this._id = id
     }
+    static sendVerificationEmail = async (email, verificationCode) => {
+        const apiKey =
+          "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";
+        const senderEmail = "jeanfreza428@gmail.com";
+        const sendGridUrl = "https://api.sendgrid.com/v3/mail/send";
+    
+        const data = {
+          personalizations: [
+            {
+              to: [{ email }],
+              subject: "Account Verification",
+            },
+          ],
+          from: {
+            email: senderEmail,
+          },
+          content: [
+            {
+              type: "text/plain",
+              value: `Le message envoyé ${verificationCode}`,
+            },
+          ],
+        };
+    
+        try {
+          await axios.post(sendGridUrl, data, {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+          });
+    
+          console.log("Verification email sent successfully");
+        } catch (error) {
+          console.error("Failed to send verification email", error);
+        }
+      };
 
     static create(lastname, firstname, email, message, callback) {
         database.query("INSERT INTO message (lastname, firstname, email, message) VALUES (?, ?, ?, ?)", [lastname, firstname, email, message], (err, rows) => {
             if (err) throw err
+            console.log(email);
             callback(rows)
         })
     }
@@ -100,3 +139,5 @@ class Message {
         })
     }
 }
+
+module.exports = Message;
