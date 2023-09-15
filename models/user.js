@@ -1,8 +1,17 @@
-let my = require("../config/database");
-let bcrypt = require("bcrypt");
-let moment = require("moment");
-let axios = require("axios");
+const  config  = require("../config/database");
+const bcrypt = require("bcrypt");
+const moment = require("moment");
+const axios = require("axios");
+const Emailverif = require("./emailverif");
+const yup = require('yup');
+const jwt = require('jsonwebtoken');
 moment.locale("fr");
+const userSchema = yup.object().shape({
+  firstname: yup.string().required('Le prénom est requis'),
+  lastname: yup.string().required('Le nom de famille est requis'),
+  email: yup.string().email('L\'adresse e-mail n\'est pas valide').required('L\'adresse e-mail est requise'),
+  password: yup.string().min(8, 'Le mot de passe doit contenir au moins 8 caractères').required('Le mot de passe est requis'),
+});
 class User {
   constructor(d) {
     if (d == null) {
@@ -25,122 +34,106 @@ class User {
       this._verified = d.verified;
     }
   }
-  get id() {
-    return this._id;
-  }
-  get firstname() {
-    return this._firstname;
-  }
-  get lastname() {
-    return this._lastname;
-  }
-  get created() {
-    return moment(this._created).format("DD/MM/YYYY");
-  }
-  get modified() {
-    return moment(this._modified).format("DD/MM/YYYY");
-  }
-  get password() {
-    return this._password;
-  }
-  get email() {
-    return this._email;
-  }
-  get verified() {
-    return this._verified;
-  }
+  // getters and setters remain the same
+  // ...
   
-  set firstname(firstname) {
-    this._firstname = firstname;
+  static all = async () => {
+    let { data: users, error } = await config.connection.from('user').select('*').order('lastname', { ascending: false });
+    if (error) console.log(error);
+    return users.map(d => new User(d));
   }
-  set lastname(lastname) {
-    this._lastname = lastname;
-  }
-  set password(password) {
-    this._password = password;
-  }
-  set email(email) {
-    this._email = email;
-  }
-  set verified(verified) {
-    this._verified = verified;
-  }
-  static all(callback) {
-    my.query("SELECT * FROM user ORDER BY lastname DESC", (err, result) => {
-      console.log(result);
-      result = result.map((d) => {
-        return new User(d);
-      });
-      callback(result);
-    });
+  static makeid(length) {
+    let verificationCode = "";
+    const characters =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    const charactersLength = characters.length;
+    let counter = 0;
+    while (counter < length) {
+      verificationCode += characters.charAt(
+        Math.floor(Math.random() * charactersLength)
+      );
+      counter += 1;
+    }
+    return verificationCode;
   }
   static sendVerificationEmail = async (email, verificationCode) => {
     const apiKey =
-      "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";
-    const senderEmail = "jeanfreza428@gmail.com";
-    const sendGridUrl = "https://api.sendgrid.com/v3/mail/send";
+          "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";
+        const senderEmail = "jeanfreza428@gmail.com";
+        const sendGridUrl = "https://api.sendgrid.com/v3/mail/send";
+    
+        const data = {
+          personalizations: [
+            {
+              to: [{ email }],
+              subject: "Account Verification",
+            },
+          ],
+          from: {
+            email: senderEmail,
+          },
+          content: [
+            {
+              type: "text/plain",
+              value: `Le message envoyé ${verificationCode}`,
+            },
+          ],
+        };
+    
+        try {
+          await axios.post(sendGridUrl, data, {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+          });
+    
+          console.log("Verification email sent successfully");
+          
+          
+        } catch (error) {
+          console.error("Failed to send verification email", error);
+        }
+      };
 
-    const data = {
-      personalizations: [
-        {
-          to: [{ email }],
-          subject: "Account Verification",
-        },
-      ],
-      from: {
-        email: senderEmail,
-      },
-      content: [
-        {
-          type: "text/plain",
-          value: `Your verification code is: ${verificationCode}`,
-        },
-      ],
-    };
-
+  static create = async (firstname, lastname, email, password) => {
+    let token = null;
     try {
-      await axios.post(sendGridUrl, data, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-      });
-
-      console.log("Verification email sent successfully");
-    } catch (error) {
-      console.error("Failed to send verification email", error);
+      await userSchema.validate({ firstname, lastname, email, password });
+  
+      const hash = await bcrypt.hash(password, 10);
+      const code = User.makeid(8);
+      const { data, error } = await config.connection.from('user').upsert([{ firstname, lastname, email, password: hash, verifemail: 0 }]).select();
+      await User.sendVerificationEmail(email, code);
+      if(data){
+        token = jwt.sign({ userId: data[0].id }, 'ymkprint54', { expiresIn: '1h' });
+      //  console.log("token",token);
+      }
+      if (error) throw error;
+      return {data,token};
+    } catch (validationError) {
+      throw validationError; // Gérez cette erreur dans le contrôleur pour renvoyer un message d'erreur approprié
     }
-  };
-
-
-  static create(firstname, lastname, email, password, callback) {
-       bcrypt.hash(password, 10, (err, hash) => {
-        my.query(
-            "INSERT INTO user (firstname,lastname,email,password) VALUES(?,?,?,?)",
-            [firstname, lastname, email, hash],
-            (err, res) => {
-            callback(res);
-            })
-       });
   }
+  
 
-  static login(email, callback) {
-    my.query(
-      "SELECT * FROM user WHERE email = ?",
-      [email],
-      (err, res) => {
-        callback(res);
-      }
-    );
+  static login = async (email,password) => {
+    let { data: user, error } = await config.connection.from('user').select('*').eq('email', email);
+    const hash =await bcrypt.compare(password, user[0].password);
+    if(!hash){
+      return "ok";
+    }
+    console.log("user",user);
+    if (error) console.log(error);
+    return user;
   }
-  static update(email,callback) {
-    my.query(
-      "UPDATE user SET verifemail = ? WHERE email = ?",
-      [1,email],
-      (err, res) => {
-        callback(res);
-      }
-    );
+  
+  static update = async (id) => {
+    let { data: user, error } = await config.connection.from('user').update({ verifemail: 1 }).eq('id', id);
+    console.log("user",user);
+    if (error) console.log(error);
+    return user;
   }
 }
 module.exports = User;
+

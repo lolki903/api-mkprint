@@ -24,19 +24,25 @@ exports.login = async (req, res) => {
   });
 }
 exports.validate = async (req, res) => {
-    const code = req.body.code;
     const id = req.body.email;
     try {
-        Emailverif.findbyemail(id,(result)=>{
-            if(result){
-              User.update(id,(result)=>{
-                console.log(result)
-                })
-                res.status(200).json({message:"email verified"})
-            }
-        })
+       const valid = await Emailverif.findbyemail(id)
+       console.log("valid",valid.id);
+       if(valid)
+       {
+          const er = await Emailverif.getid(valid.id)
+          if(er.code ==req.body.code)
+          {
+            
+            await User.update(valid.id);
+           console.log("exxx",er);
+          }
+          console.log("er",er);
+          res.status(200).json({message:"email verified"})
+        }
+            
     } catch (error) {
-        res.status(404).json({ message: error.message });
+        res.status(409).json({ message: error.message });
     }
 }
 exports.deleteUser = async (req, res) => {

@@ -1,4 +1,4 @@
-let database = require('../config/database')
+const config  = require('../config/database')
 
 class Emailverif {
     constructor(d) {
@@ -37,11 +37,10 @@ class Emailverif {
     set code(code) {
         this._code = code
     }
-    static create(iduser, code, callback) {
-        database.query("INSERT INTO email_code (user_id,code) VALUES (?,?)", [iduser, code], (err, result) => {
-            if (err) throw err
-            callback(result)
-        })
+    static async create(iduser, code) {
+        const { data, error } = await config.connection.from('email_code').insert([{ user_id: iduser, code: code }])
+        if (error) throw error
+        return data
     }
     static makeid(length) { 
         let verificationCode = "";
@@ -56,18 +55,35 @@ class Emailverif {
           counter += 1;
         }
         return verificationCode;
-        }
-    static findbyemail(email, callback) {
-        database.query("SELECT * FROM email_code JOIN user ON user.id = email_code.user_id WHERE email = ?", [email], (err, result) => {
-            if (err) throw err
-            callback(result)
-        })
     }
-    static delete(email, callback) {
-        database.query("DELETE FROM emailverif WHERE email = ?", [email], (err, result) => {
-            if (err) throw err
-            callback(result)
-        })
+    static async findbyemail(email) {
+        const { data, error } = await config.connection
+            .from('user')
+            .select('*')
+            .eq('email', email)
+            console.log(data);
+        
+        if (error) throw error
+        return data[0]
+        // console.log(data);
+        // if (error) throw error;
+        // return data;
+    }
+    static async delete(id) {
+        const { data, error } = await config.connection
+            .from('email_code')
+            .delete()
+            .eq('user_id', id)
+        if (error) throw error
+        return data
+    }
+    static async getid(id) {
+        const { data, error } = await config.connection
+            .from('email_code')
+            .select('*')
+            .eq('user_id', id)
+        if (error) throw error
+        return data[0]
     }
 }
 module.exports = Emailverif

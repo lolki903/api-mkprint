@@ -2,11 +2,18 @@ const Emailverif = require('../models/emailverif');
 const User = require('../models/user');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const yup = require('yup')
+
+const userSchema = yup.object().shape({
+    firstname: yup.string().required('Le prénom est requis'),
+    lastname: yup.string().required('Le nom de famille est requis'),
+    email: yup.string().email('L\'adresse e-mail n\'est pas valide').required('L\'adresse e-mail est requise'),
+    password: yup.string().min(8, 'Le mot de passe doit contenir au moins 8 caractères').required('Le mot de passe est requis'),
+  });
 exports.getuser = async (req, res) => {
     try {
-        User.all(function(users) {
-            res.status(200).json(users);
-        });
+        const result = await User.all();
+        res.status(200).json(result);
     } catch (error) {
         res.status(404).json({ message: error.message });
     }
@@ -15,31 +22,26 @@ exports.getuser = async (req, res) => {
 exports.createuser = async (req, res) => {
     const user = req.body;
     const code = Emailverif.makeid(8);
-    console.log(code);
+    // let token = null;
+    // console.log("d===>",code);
     try {
-        User.create(user.firstname,user.lastname,user.email,user.password,(result)=>{
-            Emailverif.create(result.insertId,code,()=>{
-                User.sendVerificationEmail(user.email,code,(result)=>{
-                    if(result){
-                        console.log("email sent");
-                    }
-                })
-            }
-            )
-            jwt.sign(user,"jeanlucien2314",{ expiresIn: "30days"}, (err, token) => {
-                    if(err){
-                        res.status(401)
-                        console.log(err)
-                        res.json({message: err})
-                    }
-                    else{
-                        res.status(200)
-                        res.json({message: "login success", token: token})
-                    }
-                })
-        })
-        
-        // res.status(201).json();
+        await userSchema.validate(user);
+       const result = await User.create(user.firstname,user.lastname,user.email,user.password);
+    //    if(result){
+    //      token = jwt.sign({ userId: result[0].id }, 'ymkprint54', { expiresIn: '1h' });
+    //     console.log("token",token);
+    //    }
+    //    console.log("caca",result[0].id);
+        const resultid = result.data[0].id
+       if (result) {
+           await Emailverif.create(resultid, code);
+           setTimeout(async () => {
+            // console.log("temps",result[0].id);
+                Emailverif.delete(resultid);
+           }, 60000);
+          
+       }
+       res.status(201).json(result);
     } catch (error) {
         res.status(409).json({ message: error.message });
     }
@@ -47,24 +49,22 @@ exports.createuser = async (req, res) => {
 exports.login = async (req, res) => {
     const user = req.body;
     try {
-        User.login(user.email,(result)=>{
-            result.map((rest)=>{
-            bcrypt.compare(user.password, rest.password, (err, resul) => {
-                // console.log(result);
-                if (err) {
-                    return res.status(500).json({ message: 'Erreur lors de la comparaison des mots de passe' });
-                    }
-                if (!resul) {
-                    return res.status(401).json({ message: 'Mot de passe incorrect' });
-                    }
-                    if(resul==false)
-                    {
-                        return res.status(401).json({ message: 'Mot de passe incorrect' });
-                    }
-                    res.status(201).json(result);
-            })
-        })
-    })
+      const utilisateur =  await User.login(user.email,user.password);
+      console.log("utilisateur",utilisateur);
+      res.status(200).json(utilisateur);
+    } catch (error) {
+        res.status(409).json({ message: error.message });
+    }
+}
+exports.createadmin = async (req, res) => {
+    const user = req.body;
+    try {
+        await userSchema.validate(user);
+        const result = await User.create(user.firstname,user.lastname,user.email,user.password);
+        
+        console.log("result",res);
+        res.setHeader('Authorization', `Bearer ${result.token}`);
+        res.status(201).json(result);
     } catch (error) {
         res.status(409).json({ message: error.message });
     }
