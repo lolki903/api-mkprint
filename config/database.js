@@ -12,6 +12,7 @@
 // connection.connect();
 
 // module.exports = connection;
+require('dotenv').config();
 let mockResponse = null;
 
 function setMockResponse(data, error) {
@@ -23,9 +24,8 @@ function getMockResponse() {
 }
 const { createClient } = require('@supabase/supabase-js');
 
-const SUPABASE_URL = 'https://vxlxnzngspqzdlwrhran.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4bHhuem5nc3BxemRsd3JocmFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE2OTQxNjM3OTYsImV4cCI6MjAwOTczOTc5Nn0.ubjGe6Qpw4nUsfrU52tg6mrj99bRxLuBfiS5jOrWdIU';
-
+const SUPABASE_URL = process.env.SUPPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPPABSE_KEY;
 const connection = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 module.exports = {connection,setMockResponse,getMockResponse};

@@ -5,6 +5,7 @@ const axios = require("axios");
 const Emailverif = require("./emailverif");
 const yup = require('yup');
 const jwt = require('jsonwebtoken');
+require('dotenv').config();
 moment.locale("fr");
 const userSchema = yup.object().shape({
   firstname: yup.string().required('Le prénom est requis'),
@@ -102,12 +103,11 @@ class User {
       await userSchema.validate({ firstname, lastname, email, password });
   
       const hash = await bcrypt.hash(password, 10);
-      const code = User.makeid(8);
       const { data, error } = await config.connection.from('user').upsert([{ firstname, lastname, email, password: hash, verifemail: 0 }]).select();
-      await User.sendVerificationEmail(email, code);
+      
       if(data){
-        token = jwt.sign({ userId: data[0].id }, 'ymkprint54', { expiresIn: '1h' });
-      //  console.log("token",token);
+        token = jwt.sign({ userId: data[0].id }, process.env.JWT_TOKEN, { expiresIn: '1h' });
+       console.log("token=======>",token);
       }
       if (error) throw error;
       return {data,token};
