@@ -73,14 +73,17 @@ const setupMiddleware = (app, authToken) => {
       servers: [
         {
           url: 'http://localhost:3003',
+          headers: {
+            'Access-Control-Allow-Origin': '*', // Required for CORS support to work
+          },
         },
       ],
     },
     apis: ['./routes/*.js'],
   };
 
-  const swaggerDocs = swaggerJsDoc(swaggerOptions);
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+  const swaggerDocs = swaggerJsDoc(swaggerOptions); // Swagger documentation
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs)); // Swagger UI
 
   const port = process.env.PORT || 3003;
   app.listen(port, () => {
